@@ -69,13 +69,11 @@ func (h *Handler) GoodMethodWithResponse(ctx context.Context, req *SomeRequest) 
 	return &SomeResponse{Data: "test"}, nil
 }
 
-// Not an RPC handler: doesn't return *Response
 func (h *Handler) NotAnRPCHandler(ctx context.Context, req *SomeRequest) (string, error) {
 	// ok: rpc-handler-nil-nil-return
 	return "", nil
 }
 
-// Not a handler method
 func regularFunction() (*SomeResponse, error) {
 	// ok: rpc-handler-nil-nil-return
 	return nil, nil

@@ -20,11 +20,14 @@ func init() {
 // goSemgrepTimeout bounds the scan so a slow semgrep can't stall the agent.
 const goSemgrepTimeout = 20 * time.Second
 
+const changedRangePadding = 3
+
 // lineRange is an inclusive span of 1-based line numbers.
 type lineRange struct {
 	start, end int
 }
 
+// handleGoSemgrep reports embedded-rule findings on the lines Claude changed. Use as a PostToolUse hook with matcher Write|Edit|MultiEdit.
 func handleGoSemgrep(in *Input) (*Output, error) {
 	filePath := extractFilePath(in)
 	if !isScannedGoFile(filePath) {
@@ -33,7 +36,7 @@ func handleGoSemgrep(in *Input) (*Output, error) {
 
 	findings, err := scanWithEmbeddedRules(filePath)
 	if err != nil {
-		// A lint tool failure shouldn't block the edit
+		// Fail open: a broken scanner must not make every Go edit fail
 		return nil, nil
 	}
 
@@ -100,7 +103,7 @@ func writeEmbeddedRules(dir string) error {
 	return nil
 }
 
-// changedLineRanges returns the lines of the file on disk that the tool call wrote.
+// changedLineRanges returns the lines the tool call wrote; nil means treat the whole file as changed.
 func changedLineRanges(in *Input, filePath string) []lineRange {
 	var newStrings []string
 	switch in.ToolName {
@@ -158,9 +161,7 @@ func occurrenceLineRanges(content, text string) []lineRange {
 	}
 }
 
-// onChangedLines keeps the findings overlapping a changed range. No ranges
-// means the whole file changed (a Write, or an Edit whose new text can't be
-// located, including deletions).
+// onChangedLines keeps findings that overlap a changed range, or all of them when ranges is empty.
 func onChangedLines(findings []semgrepFinding, ranges []lineRange) []semgrepFinding {
 	if len(ranges) == 0 {
 		return findings
@@ -169,7 +170,7 @@ func onChangedLines(findings []semgrepFinding, ranges []lineRange) []semgrepFind
 	var kept []semgrepFinding
 	for _, finding := range findings {
 		for _, r := range ranges {
-			if finding.StartLine <= r.end && finding.EndLine >= r.start {
+			if finding.StartLine <= r.end+changedRangePadding && finding.EndLine >= r.start-changedRangePadding {
 				kept = append(kept, finding)
 				break
 			}
@@ -190,10 +191,21 @@ func hasBlockingFinding(findings []semgrepFinding) bool {
 func formatGoSemgrepFindings(findings []semgrepFinding) string {
 	var b strings.Builder
 	for _, finding := range findings {
-		fmt.Fprintf(&b, "  %s:%d: [%s] %s\n", finding.Path, finding.StartLine, ruleID(finding.CheckID), strings.TrimSpace(finding.Message))
+		fmt.Fprintf(&b, "  %s:%d: [%s]\n", finding.Path, finding.StartLine, ruleID(finding.CheckID))
 		if finding.Fix != "" {
 			fmt.Fprintf(&b, "    Suggested fix: %s\n", finding.Fix)
 		}
+	}
+	if len(findings) > 0 {
+		b.WriteString("\nRules:\n")
+	}
+	seen := make(map[string]bool)
+	for _, finding := range findings {
+		if seen[finding.CheckID] {
+			continue
+		}
+		seen[finding.CheckID] = true
+		fmt.Fprintf(&b, "  [%s] %s\n", ruleID(finding.CheckID), strings.TrimSpace(finding.Message))
 	}
 	return b.String()
 }

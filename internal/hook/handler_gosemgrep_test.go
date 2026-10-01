@@ -43,10 +43,10 @@ func TestGoSemgrepRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, entry := range entries {
-		ruleID := strings.TrimSuffix(entry.Name(), ".yml")
-		t.Run(ruleID, func(t *testing.T) {
-			if _, err := os.Stat(filepath.Join(fixturesDir, ruleID+".go")); err != nil {
-				t.Errorf("rule %s has no fixture: %v", ruleID, err)
+		name := strings.TrimSuffix(entry.Name(), ".yml")
+		t.Run(name, func(t *testing.T) {
+			if _, err := os.Stat(filepath.Join(fixturesDir, name+".go")); err != nil {
+				t.Errorf("rule %s has no fixture: %v", name, err)
 			}
 		})
 	}
@@ -132,6 +132,10 @@ func legacy(ctx context.Context) {
 	slog.WithParam(ctx, "key", "value")
 }
 
+func unchanged() {
+	return
+}
+
 func added(ctx context.Context) context.Context {
 	return ctx
 }
@@ -139,7 +143,7 @@ func added(ctx context.Context) context.Context {
 
 	cleanEdit := makeToolInput("PostToolUse", "Edit", EditInput{
 		FilePath:  path,
-		OldString: "return nil",
+		OldString: "func added(ctx context.Context) context.Context {\n\treturn nil\n}",
 		NewString: "func added(ctx context.Context) context.Context {\n\treturn ctx\n}",
 	})
 	if out := runHandlerOutput(t, "go-semgrep", cleanEdit); out != nil {
@@ -148,7 +152,7 @@ func added(ctx context.Context) context.Context {
 
 	badEdit := makeToolInput("PostToolUse", "Edit", EditInput{
 		FilePath:  path,
-		OldString: "slog.WithParams(ctx, nil)",
+		OldString: `ctx = slog.WithParam(ctx, "key", "value")`,
 		NewString: `slog.WithParam(ctx, "key", "value")`,
 	})
 	out := runHandlerOutput(t, "go-semgrep", badEdit)
@@ -197,14 +201,34 @@ func check(t *testing.T, err error) {
 	}
 }
 
-func TestGoSemgrepSkipsWithoutSpawning(t *testing.T) {
+func fakeSemgrepOnPath(t *testing.T, script string) {
+	t.Helper()
 	binDir := t.TempDir()
-	marker := filepath.Join(t.TempDir(), "spawned")
-	fakeSemgrep := "#!/bin/sh\ntouch \"$GO_SEMGREP_MARKER\"\necho '{\"results\":[]}'\n"
-	if err := os.WriteFile(filepath.Join(binDir, "semgrep"), []byte(fakeSemgrep), 0o700); err != nil {
+	if err := os.WriteFile(filepath.Join(binDir, "semgrep"), []byte("#!/bin/sh\n"+script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestGoSemgrepFailsOpen(t *testing.T) {
+	for _, script := range []string{"echo not-json", "exit 1", ""} {
+		t.Run(script, func(t *testing.T) {
+			if script == "" {
+				t.Setenv("PATH", t.TempDir())
+			} else {
+				fakeSemgrepOnPath(t, script)
+			}
+			input := makeToolInput("PostToolUse", "Write", WriteInput{FilePath: writeGoFile(t, "sample.go", "package sample\n")})
+			if out := runHandlerOutput(t, "go-semgrep", input); out != nil {
+				t.Errorf("output = %+v, want nil", out)
+			}
+		})
+	}
+}
+
+func TestGoSemgrepSkipsWithoutSpawning(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "spawned")
+	fakeSemgrepOnPath(t, "touch \"$GO_SEMGREP_MARKER\"\necho '{\"results\":[]}'\n")
 	t.Setenv("GO_SEMGREP_MARKER", marker)
 
 	skipped := []string{
@@ -318,12 +342,23 @@ func TestOnChangedLines(t *testing.T) {
 	for _, finding := range onChangedLines(findings, ranges) {
 		got = append(got, finding.CheckID)
 	}
-	want := []string{"straddles", "inside"}
+	want := []string{"before", "straddles", "inside"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("kept = %v, want %v", got, want)
 	}
 
 	if all := onChangedLines(findings, nil); len(all) != len(findings) {
 		t.Errorf("no ranges kept %d findings, want all %d", len(all), len(findings))
+	}
+}
+
+func TestOnChangedLinesPadding(t *testing.T) {
+	findings := []semgrepFinding{
+		{CheckID: "near", StartLine: 12, EndLine: 12},
+		{CheckID: "far", StartLine: 20, EndLine: 20},
+	}
+	got := onChangedLines(findings, []lineRange{{start: 10, end: 10}})
+	if !reflect.DeepEqual(got, findings[:1]) {
+		t.Errorf("kept = %v, want %v", got, findings[:1])
 	}
 }
