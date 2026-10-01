@@ -1,6 +1,9 @@
 rules:
   - id: terrors-matches
-    message: "terrors.Matches and terrors.PrefixMatches are discouraged; use terrors.Is instead."
+    message: >-
+      terrors.Matches and terrors.PrefixMatches match on code prefixes or message text, which is fragile. To check an
+      error code use terrors.Is(err, code); for a wrapped stdlib or sentinel error (e.g. context.Canceled) use
+      errors.Is(err, sentinel).
     severity: ERROR
     languages: [go]
     pattern-either:
