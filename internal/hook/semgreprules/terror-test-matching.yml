@@ -1,0 +1,11 @@
+rules:
+  - id: terror-test-matching
+    message: "You're better off using test.AssertTerrorMatches; test failures will show you the expected and actual values, rather than just failing."
+    severity: WARNING
+    languages: [go]
+    pattern: $PKG.$FUNC($T, terrors.Is(...), ...)
+    paths:
+      include:
+        - "*_test.go"
+      exclude:
+        - "**/bedrock/**/*.go"

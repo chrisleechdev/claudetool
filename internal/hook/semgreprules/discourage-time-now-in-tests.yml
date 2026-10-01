@@ -1,0 +1,37 @@
+rules:
+  - id: discourage-time-now-in-tests
+    message: |
+      Using `time.Now()` in tests makes them non-deterministic.
+
+      Instead, use the clock library to set values directly:
+
+      ```go
+      import "github.com/monzo/wearedev/libraries/clock"
+
+      func TestSomething(t *testing.T) {
+          m, ctx := test.NewEmptyMock(t)
+          fixedTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+          clock.SetMockTime(m, fixedTime)
+
+          result := DoSomething(ctx)
+          assert.Equal(t, fixedTime, result.Timestamp)
+      }
+      ```
+
+      If you require relative values, you can use `clock.Now(ctx)` after setting
+      a mock time (otherwise it'll just use `time.Now` in the background).
+
+      Please check out:
+
+      https://godoc.tools.prod.prod-ffs.io/pkg/github.com/monzo/wearedev/libraries/clock/
+
+      (If this error is in your terminal you can ⌘ + double click the link to open it in your browser)
+    severity: INFO
+    languages: [go]
+    pattern: time.Now()
+    fix: clock.Now(ctx)
+    paths:
+      include:
+        - "*_test.go"
+      exclude:
+        - "**/libraries/clock/*_test.go"

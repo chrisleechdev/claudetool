@@ -1,0 +1,12 @@
+rules:
+  - id: terrors-sprintf-message
+    message: >-
+      Don't interpolate values into terror messages with fmt.Sprintf; pass them as params
+      instead, e.g. terrors.Augment(err, "failed to process", map[string]string{"user_id": userID}).
+    severity: ERROR
+    languages: [go]
+    patterns:
+      - pattern: terrors.$F($FIRST, fmt.Sprintf(...), ...)
+      - pattern-not: terrors.Is(...)
+      - pattern-not: terrors.Matches(...)
+      - pattern-not: terrors.PrefixMatches(...)

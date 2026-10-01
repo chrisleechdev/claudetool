@@ -1,0 +1,16 @@
+rules:
+- id: distsync-unlock-not-deferred
+  message: >-
+    Distsync lock is immediately unlocked after an error check. Did you mean to defer
+    unlocking the lock?
+  severity: ERROR
+  languages: [go]
+  patterns:
+    - pattern: $LOCK.Unlock()
+    - pattern-inside: |
+        $LOCK, $ERR := distsync.Lock(...)
+        if <... $ERR ...> {
+          ...
+        }
+        $LOCK.Unlock()
+  fix: defer $LOCK.Unlock()

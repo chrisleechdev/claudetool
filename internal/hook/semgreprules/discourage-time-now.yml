@@ -1,0 +1,22 @@
+rules:
+  - id: discourage-time-now
+    message: |
+      Consider using `clock.Now(ctx)` instead of `time.Now()` to make your code more testable and deterministic.
+
+      The clock library allows tests to mock time using `clock.SetMockTime()`, making tests more reliable.
+
+      Please check out:
+
+      https://godoc.tools.prod.prod-ffs.io/pkg/github.com/monzo/wearedev/libraries/clock/
+
+      (If this error is in your terminal you can ⌘ + double click the link to open it in your browser)
+    severity: INFO
+    languages: [go]
+    pattern: time.Now()
+    fix: clock.Now(ctx)
+    paths:
+      include:
+        - "*.go"
+      exclude:
+        - "*_test.go"
+        - "**/libraries/clock/*"

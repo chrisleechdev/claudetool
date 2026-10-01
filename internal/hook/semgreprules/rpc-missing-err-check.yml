@@ -1,0 +1,29 @@
+rules:
+- id: rpc-missing-err-check
+  message: |
+    Missing RPC error check - did you mean to check for an error after calling it?
+  severity: ERROR
+  languages: [go]
+  patterns:
+    - pattern: |
+        $X.Send(...).DecodeResponse()
+        if <...$ERR != nil...> {
+          ...
+        }
+    - pattern-not: |
+          $ERR = $X.Send(...).DecodeResponse()
+          if <...$ERR != nil...> {
+            ...
+          }
+    - pattern-not: |
+          ..., $ERR = $X.Send(...).DecodeResponse()
+          if <...$ERR != nil...> {
+            ...
+          }
+    - metavariable-regex:
+        metavariable: "$ERR"
+        regex: "err|(.*Err$)"
+  paths:
+    # Tests typically contain false positives, so we exclude them.
+    exclude:
+      - "*_test.go"
