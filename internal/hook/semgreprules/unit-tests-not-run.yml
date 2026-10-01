@@ -1,0 +1,25 @@
+rules:
+  - id: unit-tests-not-run
+    message: "Your package contains a TestMain() function in *_test.go file - you need to explicitly call test.RunTests($M) or $M.Run() - see https://pkg.go.dev/testing#hdr-Main"
+    severity: ERROR
+    languages: [ go ]
+    patterns:
+      - pattern: |
+          func TestMain($M *testing.M) {
+            ...
+          }
+      - pattern-not-inside: |
+          func TestMain($M *testing.M) {
+            ...
+            $M.Run()
+            ...
+          }
+      - pattern-not-inside: |
+          func TestMain($M *testing.M) {
+            ...
+            test.RunTests($M)
+            ...
+          }
+    paths:
+      include:
+        - "*_test.go"

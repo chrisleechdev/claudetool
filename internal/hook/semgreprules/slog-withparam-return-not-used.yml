@@ -1,0 +1,24 @@
+rules:
+  - id: slog-withparam-return-not-used
+    message: |
+      slog.WithParam and slog.WithParams return a new context with the parameters attached.
+      You must use the return value, typically by assigning it back to ctx:
+
+      Incorrect: slog.WithParam(ctx, "key", "value")
+      Correct:   ctx = slog.WithParam(ctx, "key", "value")
+
+      The functions don't mutate the original context - they return a new one.
+    severity: ERROR
+    languages: [go]
+    patterns:
+      - pattern-either:
+          - pattern: slog.WithParam($CTX, $KEY, $VALUE)
+          - pattern: slog.WithParams($CTX, $PARAMS)
+      - pattern-not-inside: $VAR = slog.WithParam(...)
+      - pattern-not-inside: $VAR = slog.WithParams(...)
+      - pattern-not-inside: $VAR := slog.WithParam(...)
+      - pattern-not-inside: $VAR := slog.WithParams(...)
+      - pattern-not-inside: return slog.WithParam(...)
+      - pattern-not-inside: return slog.WithParams(...)
+      - pattern-not-inside: $FUNC(slog.WithParam(...), ...)
+      - pattern-not-inside: $FUNC(slog.WithParams(...), ...)

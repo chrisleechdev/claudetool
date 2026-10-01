@@ -1,0 +1,25 @@
+rules:
+  - id: rpc-handler-nil-nil-return
+    patterns:
+      - pattern-inside: |
+          func ($RECEIVER *$HANDLER) $METHOD(...) (*$RESPONSE, error) {
+            ...
+          }
+      - pattern: return nil, nil
+      - metavariable-regex:
+          metavariable: "$RESPONSE"
+          regex: ".*Response$"
+    message: >-
+      RPC handler returned nil response and nil error. This breaks the RPC contract
+      as the caller will attempt to unmarshal an empty byte array as the expected
+      response proto message. Either return a non-nil response with nil error, or
+      return nil response with a non-nil error.
+    severity: ERROR
+    languages: [go]
+    paths:
+      include:
+        - "**/handler/**/*.go"
+      exclude:
+        - "*_test.go"
+        - "**/service.api.*/**"
+        - "**/service.iapi.*/**"

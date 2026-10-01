@@ -1,0 +1,24 @@
+rules:
+  - id: discourage-context-background
+    message: |
+      Avoid using `context.Background()` or `context.TODO()` in production code.
+
+      Creating a new context discards any upstream trace, breaking our ability to
+      track load across the system. If the code downstream of this call hits
+      keyspaces, streams, makes rpc calls or does meaningful CPU work, that load
+      becomes invisible to tracing and capacity tooling.
+
+      Instead, pass through a context from an upstream caller (e.g. the handler's
+      `ctx` parameter) so that the trace propagates end-to-end. If you need to
+      detach from the parent context's cancellation while preserving trace data,
+      use `context.WithoutCancel(ctx)`.
+    severity: INFO
+    languages: [go]
+    pattern-either:
+      - pattern: context.Background()
+      - pattern: context.TODO()
+    paths:
+      exclude:
+        - "*_test.go"
+        - "**/main.go"
+        - "**/libraries/clock/*"

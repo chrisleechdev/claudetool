@@ -1,0 +1,29 @@
+rules:
+  - id: no-use-after-nil-check
+    message: |
+      It looks like you are returning an error that will always be nil. This is likely a coding error and may cause a silent failure.
+
+      Either explicitly return nil or return a custom error if this is a bug.
+    languages: [ go ]
+    severity: ERROR
+    pattern-either:
+      - patterns:
+          # The rule should flag if an error is checked for nil, and then returned after the check
+          # TODO: should the below be based on metavariables? e.g. if ($ERR: error) != nil { ... } return $ERR
+          - pattern: |
+              if err != nil {
+                ...
+                return ...
+              }
+              ...
+              return <...err...>
+          # If the error is redefined either by = or := before the return, it's not a problem
+          - pattern-not: |
+              if err != nil {
+                ...
+                return ...
+              }
+              ...
+              <...err...> = ...
+              ...
+              return <...err...>

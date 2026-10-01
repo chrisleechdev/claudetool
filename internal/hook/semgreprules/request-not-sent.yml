@@ -1,0 +1,13 @@
+rules:
+- id: request-not-sent
+  message: |
+    Request isn't sent.
+  severity: ERROR
+  languages: [go]
+  patterns:
+    - pattern-inside: |
+        $X = typhon.NewRequest(...)
+        ...
+        $X.Decode(...)
+    - pattern-not: |
+        $X.Send()

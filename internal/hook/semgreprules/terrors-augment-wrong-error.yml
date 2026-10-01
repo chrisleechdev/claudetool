@@ -1,0 +1,49 @@
+rules:
+  - id: terrors-augment-wrong-error
+    patterns:
+      - pattern: |
+          terrors.Augment(err, $_, $_)
+      - pattern-inside:
+          pattern-either:
+            - pattern: |
+                if $ERR_A != nil {
+                  ...
+                  return terrors.Augment($ERR_B, $_, $_)
+                }
+            - pattern: |
+                if $ERR_A != nil {
+                  ...
+                  return ..., terrors.Augment($ERR_B, $_, $_)
+                }
+        # Exclude where the correct error is being used
+      - pattern-not-inside: |
+          if err != nil {
+            ...
+          }
+      - pattern-not-inside: |
+          if $ERR_A != nil {
+            ...
+            if $_ != nil {
+              ...
+            }
+          }
+      - pattern-not-inside: |
+          if err := ...; err != nil {
+            ...
+          }
+      - pattern-not-inside: |
+          switch {
+          case err != nil:
+            ...
+          }
+      - pattern-not-inside: |
+          if $ERR_A != nil {
+            ...
+            err := ...
+            ...
+          }
+    message: >
+      It looks like we're augmenting the wrong error variable, this could result in us silently swallowing an error.
+      Should we be using $ERR_A instead? Learn more about this check here: https://stackoverflowteams.com/c/monzo/questions/4908
+    languages: [ go ]
+    severity: ERROR

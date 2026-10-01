@@ -1,0 +1,45 @@
+rules:
+  - id: terrors-is-not-checked
+    message: "Result from terrors.Is() is not being checked; use test.AssertTerrorMatches() instead."
+    severity: ERROR
+    languages: [go]
+    patterns:
+      - pattern: |
+          terrors.Is($...ARGS)
+      - pattern-not-inside: |
+          assert.$FUNC(t, terrors.Is($...ARGS), ...)
+      - pattern-not-inside: |
+          require.$FUNC(t, terrors.Is($...ARGS), ...)
+      - pattern-not-inside: |
+          $SUITE.Assert().$FUNC(terrors.Is($...ARGS), ...)
+      - pattern-not-inside: |
+          $SUITE.Require().$FUNC(terrors.Is($...ARGS), ...)
+      - pattern-not-inside: |
+          $VAR := terrors.Is($...ARGS)
+          assert.$FUNC(t, $VAR, ...)
+      - pattern-not-inside: |
+          $VAR = terrors.Is($...ARGS)
+          assert.$FUNC(t, $VAR, ...)
+      - pattern-not-inside: |
+          $VAR := terrors.Is($...ARGS)
+          require.$FUNC(t, $VAR, ...)
+      - pattern-not-inside: |
+          $VAR = terrors.Is($...ARGS)
+          require.$FUNC(t, $VAR, ...)
+      - pattern-not-inside: |
+          return <... terrors.Is($...ARGS) ...>
+      - pattern-not-inside: |
+          if <... terrors.Is($...ARGS) ...> {
+            ...
+          }
+      # Comprehensively checking for terrors.Is() in any case statement isn't fully
+      # supported (see https://github.com/semgrep/semgrep/issues/10086), so we're
+      # checking for a generic switch statement to avoid false positives.
+      - pattern-not-inside: |
+          switch {
+          case ...
+          }
+    fix: test.AssertTerrorMatches(t, $...ARGS)
+    paths:
+      include:
+        - "*_test.go"

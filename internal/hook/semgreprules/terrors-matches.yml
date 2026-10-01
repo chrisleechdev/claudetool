@@ -1,0 +1,8 @@
+rules:
+  - id: terrors-matches
+    message: "terrors.Matches and terrors.PrefixMatches are discouraged; use terrors.Is instead."
+    severity: ERROR
+    languages: [go]
+    pattern-either:
+      - pattern: terrors.Matches(...)
+      - pattern: terrors.PrefixMatches(...)

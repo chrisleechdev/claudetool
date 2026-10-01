@@ -2,6 +2,7 @@ package hook
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -47,6 +48,16 @@ func extractFilePath(in *Input) string {
 	return obj.FilePath
 }
 
+type semgrepFinding struct {
+	CheckID   string
+	Path      string
+	StartLine int
+	EndLine   int
+	Message   string
+	Severity  string
+	Fix       string
+}
+
 func runSemgrep(ruleYAML, filePath string) (string, error) {
 	f, err := os.CreateTemp("", "semgrep-rule-*.yml")
 	if err != nil {
@@ -60,18 +71,46 @@ func runSemgrep(ruleYAML, filePath string) (string, error) {
 	}
 	f.Close()
 
-	cmd := exec.Command("semgrep", "scan", "--quiet", "--json", "--config", f.Name(), filePath)
+	data, err := runSemgrepConfig(context.Background(), f.Name(), filePath)
+	if err != nil {
+		return "", err
+	}
+	return parseSemgrepOutput(data), nil
+}
+
+// runSemgrepConfig scans filePath with the rules at configPath and returns semgrep's JSON output.
+func runSemgrepConfig(ctx context.Context, configPath, filePath string, extraFlags ...string) ([]byte, error) {
+	args := append([]string{"scan", "--quiet", "--json"}, extraFlags...)
+	args = append(args, "--config", configPath, filePath)
+
+	cmd := exec.CommandContext(ctx, "semgrep", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return "", err
+		return nil, err
 	}
-	return parseSemgrepOutput(stdout.Bytes()), nil
+	return stdout.Bytes(), nil
 }
 
 func parseSemgrepOutput(data []byte) string {
+	findings, err := parseSemgrepFindings(data)
+	if err != nil {
+		return string(data)
+	}
+	if len(findings) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	for _, f := range findings {
+		fmt.Fprintf(&b, "  %s:%d: [%s] %s\n", f.Path, f.StartLine, f.CheckID, f.Message)
+	}
+	return b.String()
+}
+
+func parseSemgrepFindings(data []byte) ([]semgrepFinding, error) {
 	var result struct {
 		Results []struct {
 			CheckID string `json:"check_id"`
@@ -79,21 +118,31 @@ func parseSemgrepOutput(data []byte) string {
 			Start   struct {
 				Line int `json:"line"`
 			} `json:"start"`
+			End struct {
+				Line int `json:"line"`
+			} `json:"end"`
 			Extra struct {
-				Message string `json:"message"`
+				Message  string `json:"message"`
+				Severity string `json:"severity"`
+				Fix      string `json:"fix"`
 			} `json:"extra"`
 		} `json:"results"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return string(data)
-	}
-	if len(result.Results) == 0 {
-		return ""
+		return nil, err
 	}
 
-	var b strings.Builder
+	findings := make([]semgrepFinding, 0, len(result.Results))
 	for _, r := range result.Results {
-		fmt.Fprintf(&b, "  %s:%d: [%s] %s\n", r.Path, r.Start.Line, r.CheckID, r.Extra.Message)
+		findings = append(findings, semgrepFinding{
+			CheckID:   r.CheckID,
+			Path:      r.Path,
+			StartLine: r.Start.Line,
+			EndLine:   r.End.Line,
+			Message:   r.Extra.Message,
+			Severity:  r.Extra.Severity,
+			Fix:       r.Extra.Fix,
+		})
 	}
-	return b.String()
+	return findings, nil
 }

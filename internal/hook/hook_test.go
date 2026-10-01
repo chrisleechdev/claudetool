@@ -232,6 +232,7 @@ func TestHandlersRegistered(t *testing.T) {
 		"no-diff-master":     true,
 		"use-linear-mcp":     true,
 		"go-swallowed-error": true,
+		"go-semgrep":         true,
 		"go-augment-style":   true,
 		"redirect-writes":    true,
 		"dump":               true,

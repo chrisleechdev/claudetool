@@ -1,0 +1,7 @@
+rules:
+  - id: slog-from-error
+    message: "Calling slog.FromError with nil instead of the error – this won't work"
+    severity: ERROR
+    languages: [go]
+    pattern: slog.FromError($X, $MSG, nil, ...)
+    fix: slog.FromError($X, $MSG, err)
