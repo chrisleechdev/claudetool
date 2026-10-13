@@ -15,7 +15,6 @@ func useAfterNil() error {
 	return err
 }
 
-// Only err-named variables are checked
 func allowsOtherVariables() error {
 	something := somethingThatReturnsError()
 	if something != nil {

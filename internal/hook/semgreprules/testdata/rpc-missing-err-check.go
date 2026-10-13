@@ -30,7 +30,6 @@ func main() {
 		return
 	}
 
-	// Best-effort sends deliberately ignore the error
 	// ok:rpc-missing-err-check
 	slackproto.PostRequest{}.Send(ctx).DecodeResponse()
 }

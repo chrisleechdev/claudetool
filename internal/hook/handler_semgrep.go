@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
+	"time"
 )
 
 // semgrepHandler returns a Handler that runs semgrep with the given YAML rule
@@ -84,6 +86,11 @@ func runSemgrepConfig(ctx context.Context, configPath, filePath string, extraFla
 	args = append(args, "--config", configPath, filePath)
 
 	cmd := exec.CommandContext(ctx, "semgrep", args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	cmd.WaitDelay = 2 * time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

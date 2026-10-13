@@ -8,8 +8,6 @@ rules:
       Please check out:
 
       https://godoc.tools.prod.prod-ffs.io/pkg/github.com/monzo/wearedev/libraries/clock/
-
-      (If this error is in your terminal you can ⌘ + double click the link to open it in your browser)
     severity: INFO
     languages: [go]
     pattern: time.Now()
