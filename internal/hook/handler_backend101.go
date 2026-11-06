@@ -2,7 +2,10 @@ package hook
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -54,6 +57,10 @@ func handleBackend101(in *Input) (*Output, error) {
 	}
 
 	if !strings.HasSuffix(filePath, ".go") {
+		return nil, nil
+	}
+
+	if !inWearedevModule(filePath) {
 		return nil, nil
 	}
 
@@ -146,6 +153,42 @@ func handleBackend101(in *Input) (*Output, error) {
 	}
 
 	return nil, nil
+}
+
+const wearedevModule = "github.com/monzo/wearedev"
+
+// inWearedevModule reports whether filePath belongs to the wearedev Go module,
+// judged by the nearest go.mod above it. The directory need not exist yet.
+func inWearedevModule(filePath string) bool {
+	dir := filepath.Dir(filePath)
+	for {
+		data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+		if err == nil {
+			module := modulePath(data)
+			return module == wearedevModule || strings.HasPrefix(module, wearedevModule+"/")
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return false
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
+}
+
+// modulePath returns the path from the module directive of a go.mod file,
+// or "" if there is none.
+func modulePath(goMod []byte) string {
+	for _, line := range strings.Split(string(goMod), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || fields[0] != "module" {
+			continue
+		}
+		return strings.Trim(fields[1], "\"`")
+	}
+	return ""
 }
 
 // camelToSnake converts CamelCase to snake_case.
